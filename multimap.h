@@ -1,5 +1,5 @@
-#ifndef MULTISET_H_
-#define MULTISET_H_
+#ifndef MULTI_MAP_H_
+#define MULTI_MAP_H_
 
 #include <cstddef>
 #include <algorithm>
@@ -10,274 +10,314 @@
 #include <map>
 #include <stdexcept> // For std::runtime_error
 
-template <typename K>
-class Multiset {
+
+// Change Map to Multimap
+// Simple Multi-Map implementation using a red-black tree
+// multimap allows multiple values for the same key
+template <typename K, typename V>
+class Multi_Map {
  public:
-  //
-  // Public API
-  // Constructor 
+  // node stores a key-value pair with references to the left and right children
+    struct Node {
+        K key;
+        std::vector<V> values; // change V to be store a vector of values instead of single values
+        bool color;
+        std::unique_ptr<Node> left;
+        std::unique_ptr<Node> right;
 
-  Multiset() : root(nullptr), size(0) {}
+        // Constructor 
+        Node(const K &key, const V &value, bool color) : key(key), value(value), color(color) {
+            value.push_back(value);
+        }
 
-  // Destructor
-  ~Multiset() {
-    Clear(root);
-  }
+    };
 
-  // * Capacity
-  // Returns number of items in multiset --O(1)
-  size_t Size() const {
-    return size;
-  }
+    // Constructor
+    Multi_Map() : root(nullptr), size_(0) {}
 
-  // Returns true if multiset is empty --O(1)
-  bool Empty() const {
-    return size == 0;
-  }
-
-  // * Modifiers
-  // Inserts an item corresponding to @key in multiset --O(log N) on average
-  void Insert(const K &key) {
-    root = Insert(root, key);
-    size++;
-  }
-
-  // Removes an item corresponding to @key from multiset --O(log N) on average
-  // Throws exception if key doesn't exist
-  void Remove(const K &key) {
-    if (!Contains(key)) {
-      throw std::runtime_error("No key");
+    // Destructor
+    ~Multi_Map() {
+        Clear();
     }
-    root = Remove(root, key);
-    size--;
-  }
 
-  // * Lookup
-  // Return whether @key is found in multiset --O(log N) on average
-  bool Contains(const K& key) const {
-    return Contains(root, key) != nullptr;
-  }
 
-  // Returns number of items matching @key in multiset --O(log N) on average
-  // Throws exception if key doesn't exist
-  size_t Count(const K& key) const {
-    Node* node = Contains(root, key);
-    if (!node) {
-      throw std::runtime_error("No key");
-    }
-    return node->count;
-  }
-
-  // Return greatest key less than or equal to @key --O(log N) on average
-  // Throws exception if multiset is empty or no floor exists for key
-  const K& Floor(const K &key) const {
-    if (!root) {
-      throw std::runtime_error("Empty multiset");
-    }
-    Node* floor_node = Floor(root, key);
-    if (!floor_node) {
-      throw std::runtime_error("No floor exists for key");
-    }
-    return floor_node->key;
-  }
-
-  // Return least key greater than or equal to @key --O(log N) on average
-  // Throws exception if multiset is empty or no ceil exists for key
-  const K& Ceil(const K &key) const {
-    if (!node) {
-        return 0; 
-    }
-    if (key == node->key) {
-        return node->key;
-    }
-    if (key > node->key) {
-        return Ceil(node->right, key);
-    }
-    unsigned int ceil = Ceil(node->left, key);
-    return ceil ? ceil : node->key;
-}
-
-  // Return max key in multiset --O(log N) on average
-  // Throws exception if multiset is empty
-  const K& Max() const {
-    if (!root) {
-      throw std::runtime_error("Empty multiset");
-    }
-    return Max(root)->key;
-  }
-
-  // Return min key in multiset --O(log N) on average
-  // Throws exception if multiset is empty
-  const K& Min() const {
-    if (!root) {
-      throw std::runtime_error("Empty multiset");
-    }
-    return Min(root)->key;
-  }
+  // Return size of tree
+  unsigned int Size();
+  // Return value associated to @key
+  const V& Get(const K& key);
+  // Return whether @key is found in tree
+  bool Contains(const K& key);
+  // Return max key in tree
+  const K& Max();
+  // Return min key in tree
+  const K& Min();
+  // Insert @key in tree
+  void Insert(const K &key, const V &value);
+  // Remove @key from tree
+  void Remove(const K &key);
+  // Print tree in-order
+  void Print();
 
  private:
-  // define Node struct as a pointer 
-  struct Node {
-    K key; // Key stored in the node
-    int count; // Number of occurrences of the key
-    Node* left; // Pointer to the left child
-    Node* right; // Pointer to the right child
-
-    // Constructor to initialize a node
-    Node(const K& key) : key(key), count(1), left(nullptr), right(nullptr) {}
+  enum Color { RED, BLACK };
+  struct Node{
+    K key;
+    V value;
+    bool color;
+    std::unique_ptr<Node> left;
+    std::unique_ptr<Node> right;
   };
+  std::unique_ptr<Node> root;
+  unsigned int cur_size = 0;
 
-  // root is the top of the tree
-  Node* root;
+  // Iterative helper methods
+  Node* Get(Node *n, const K &key);
 
-  // size is the number of nodes in the tree
-  size_t size;
+  // Recursive helper methods
+  Node* Min(Node *n);
+  void Insert(std::unique_ptr<Node> &n, const K &key, const V &value);
+  void Remove(std::unique_ptr<Node> &n, const K &key);
+  void Print(Node *n);
 
-  // How to insert a new node in the AVL Tree
-  // you have to first see if the tree is empty, if it is then you insert the new node as the root
-  // if the tree is not empty, you have to compare the new node to the root node
-  // if the new node is less than the root node, you insert the new node to the left of the root node
-  // if the new node is greater than the root node, you insert the new node to the right of the root node
-  // if the new node is equal to the root node, you increment the count of the root node
-  Node* Insert(Node* node, const K& key) {
-    if (node == nullptr) {
-      return new Node(key);
-    }
-    if (key < node->key) {
-      node->left = Insert(node->left, key);
-    } else if (key > node->key) {
-      node->right = Insert(node->right, key);
-    } else {
-      node->count++; // Increment count if key already exists
-    }
-    return node;
-  }
-
-  // How to remove a node from the AVL Tree
-  // you have to first see if the tree is empty, if it is then you throw an exception
-  // if the tree is not empty, you have to compare the node to the root node
-  // if the node is less than the root node, you remove the node from the left of the root node
-  // if the node is greater than the root node, you remove the node from the right of the root node
-  Node* Remove(Node* node, const K& key) {
-    if (node == nullptr) {
-      throw std::runtime_error("No key");
-    }
-    if (key < node->key) {
-      node->left = Remove(node->left, key);
-    } else if (key > node->key) {
-      node->right = Remove(node->right, key);
-    } else {
-      if (node->count > 1) {
-        node->count--; // Decrement count if key has multiple occurrences
-      } else {
-        if (node->left == nullptr) {
-          Node* right = node->right;
-          delete node;
-          return right;
-        }
-        if (node->right == nullptr) {
-          Node* left = node->left;
-          delete node;
-          return left;
-        }
-        Node* min = Min(node->right); // Find the minimum node in the right subtree
-        node->key = min->key; // Replace the current node's key with the minimum key
-        node->count = min->count; // Replace the current node's count with the minimum count
-        node->right = Remove(node->right, min->key); // Remove the minimum node
-      }
-    }
-    return node;
-  }
-
-  // How to find a node in the AVL Tree
-  // you have to first see if the tree is empty, if it is then you return nullptr
-  // if the tree is not empty, you have to compare the node to the root node
-  // if the node is less than the root node, you find the node from the left of the root node
-  // if the node is greater than the root node, you find the node from the right of the root node
-  // you keep repeating this process until you find the node
-  Node* Contains(Node* node, const K& key) const {
-    if (node == nullptr) {
-      return nullptr;
-    }
-    if (key < node->key) {
-      return Contains(node->left, key);
-    } else if (key > node->key) {
-      return Contains(node->right, key);
-    } else {
-      return node;
-    }
-  }
-
-  // How to find the floor of a node in the AVL Tree
-  // you have to first see if the tree is empty, if it is then you return nullptr
-  // if the tree is not empty, you have to compare the node to the root node
-  // if the node is less than the root node, you find the floor of the node from the left of the root node
-  // if the node is greater than the root node, you find the floor of the node from the right of the root node
-  // you keep repeating this process until you find the floor of the node
-  Node* Floor(Node* node, const K& key) const {
-    if (node == nullptr) {
-      return nullptr;
-    }
-    if (key == node->key) {
-      return node;
-    }
-    if (key < node->key) {
-      return Floor(node->left, key);
-    }
-    Node* floor = Floor(node->right, key);
-    return floor ? floor : node;
-  }
-
-  // How to find the ceil of a node in the AVL Tree
-  // you have to first see if the tree is empty, if it is then you return nullptr
-  // if the tree is not empty, you have to compare the node to the root node
-  // if the node is less than the root node, you find the ceil of the node from the left of the root node
-  // if the node is greater than the root node, you find the ceil of the node from the right of the root node
-  // you keep repeating this process until you find the ceil of the node
-  Node* Ceil(Node* node, const K& key) const {
-    if (node == nullptr) {
-      return nullptr;
-    }
-    if (key == node->key) {
-      return node;
-    }
-    if (key > node->key) {
-      return Ceil(node->right, key);
-    }
-    Node* ceil = Ceil(node->left, key);
-    return ceil ? ceil : node;
-  }
-
-  // How to find the max of a node in the AVL Tree
-  // see if the tree is empty, if it is then you return nullptr
-  // if the tree is not empty, you find the max of the node from the right of the root node
-  // you keep repeating this process until you find the max of the node
-  Node* Max(Node* node) const {
-    while (node->right) {
-      node = node->right;
-    }
-    return node;
-  }
-
-  // How to find the min of a node in the AVL Tree
-  // repeat the same process as max but from the left of the root node
-  Node* Min(Node* node) const {
-    while (node->left) {
-      node = node->left;
-    }
-    return node;
-  }
-
-  // to prevent memory leaks, you have to clear the tree
-  // delete the left and right nodes of the root node
-  void Clear(Node* node) {
-    if (node == nullptr) {
-      return;
-    }
-    Clear(node->left);
-    Clear(node->right);
-    delete node;
-  }
+  // Helper methods for the self-balancing
+  bool IsRed(Node *n);
+  void FlipColors(Node *n);
+  void RotateRight(std::unique_ptr<Node> &prt);
+  void RotateLeft(std::unique_ptr<Node> &prt);
+  void FixUp(std::unique_ptr<Node> &n);
+  void MoveRedRight(std::unique_ptr<Node> &n);
+  void MoveRedLeft(std::unique_ptr<Node> &n);
+  void DeleteMin(std::unique_ptr<Node> &n);
 };
 
-#endif  // MULTISET_H_
+template <typename K, typename V>
+unsigned int Multi_Map<K, V>::Size() {
+  return cur_size;
+}
+template <typename K, typename V>
+//Method Get() should return the first value in the list of values associated to the given key.
+typename Multi_Map<K, V>::Node* Multi_Map<K, V>::Get(Node *n, const K &key) {
+  while (n) {
+    if (key == n->key)
+      return n;
+
+    if (key < n->key)
+      n = n->left.get();
+    else
+      n = n->right.get();
+  }
+  return nullptr;
+}
+
+template <typename K, typename V>
+const V& Multi_Map<K, V>::Get(const K &key) {
+  Node *n = Get(root.get(), key);
+  if (!n)
+    throw std::runtime_error("Error: cannot find key");
+  return n->values[0]; // return the first value in the list
+}
+
+template <typename K, typename V>
+bool Multi_Map<K, V>::Contains(const K &key) {
+  return Get(root.get(), key) != nullptr;
+}
+
+template <typename K, typename V>
+const K& Multi_Map<K, V>::Max(void) {
+  Node *n = root.get();
+  while (n->right) n = n->right.get();
+  return n->key;
+}
+
+template <typename K, typename V>
+const K& Multi_Map<K, V>::Min(void) {
+  return Min(root.get())->key;
+}
+
+template <typename K, typename V>
+typename Multi_Map<K, V>::Node* Multi_Map<K, V>::Min(Node *n) {
+  if (n->left)
+    return Min(n->left.get());
+  else
+    return n;
+}
+
+template <typename K, typename V>
+bool Multi_Map<K, V>::IsRed(Node *n) {
+  if (!n) return false;
+  return (n->color == RED);
+}
+
+template <typename K, typename V>
+void Multi_Map<K, V>::FlipColors(Node *n) {
+  n->color = !n->color;
+  n->left->color = !n->left->color;
+  n->right->color = !n->right->color;
+}
+
+template <typename K, typename V>
+void Multi_Map<K, V>::RotateRight(std::unique_ptr<Node> &prt) {
+  std::unique_ptr<Node> chd = std::move(prt->left);
+  prt->left = std::move(chd->right);
+  chd->color = prt->color;
+  prt->color = RED;
+  chd->right = std::move(prt);
+  prt = std::move(chd);
+}
+
+template <typename K, typename V>
+void Multi_Map<K, V>::RotateLeft(std::unique_ptr<Node> &prt) {
+  std::unique_ptr<Node> chd = std::move(prt->right);
+  prt->right = std::move(chd->left);
+  chd->color = prt->color;
+  prt->color = RED;
+  chd->left = std::move(prt);
+  prt = std::move(chd);
+}
+
+template <typename K, typename V>
+void Multi_Map<K, V>::FixUp(std::unique_ptr<Node> &n) {
+  // Rotate left if there is a right-leaning red node
+  if (IsRed(n->right.get()) && !IsRed(n->left.get()))
+    RotateLeft(n);
+  // Rotate right if red-red pair of nodes on left
+  if (IsRed(n->left.get()) && IsRed(n->left->left.get()))
+    RotateRight(n);
+  // Recoloring if both children are red
+  if (IsRed(n->left.get()) && IsRed(n->right.get()))
+    FlipColors(n.get());
+}
+
+template <typename K, typename V>
+void Multi_Map<K, V>::MoveRedRight(std::unique_ptr<Node> &n) {
+  FlipColors(n.get());
+  if (IsRed(n->left->left.get())) {
+    RotateRight(n);
+    FlipColors(n.get());
+  }
+}
+
+template <typename K, typename V>
+void Multi_Map<K, V>::MoveRedLeft(std::unique_ptr<Node> &n) {
+  FlipColors(n.get());
+  if (IsRed(n->right->left.get())) {
+    RotateRight(n->right);
+    RotateLeft(n);
+    FlipColors(n.get());
+  }
+}
+
+template <typename K, typename V>
+void Multi_Map<K, V>::DeleteMin(std::unique_ptr<Node> &n) {
+  // No left child, min is 'n'
+  if (!n->left) {
+    // Remove n
+    n = nullptr;
+    return;
+  }
+if (!IsRed(n->left.get()) && !IsRed(n->left->left.get()))
+    MoveRedLeft(n);
+
+  DeleteMin(n->left);
+
+  FixUp(n);
+}
+
+template <typename K, typename V>
+void Multi_Map<K, V>::Remove(const K &key) {
+  if (!Contains(key))
+    return;
+  Remove(root, key);
+  cur_size--;
+  if (root)
+    root->color = BLACK;
+}
+
+template <typename K, typename V>
+void Multi_Map<K, V>::Remove(std::unique_ptr<Node> &n, const K &key) {
+  // Key not found
+  if (!n) return;
+  if (subtree_root -> values.size() > 1) {
+    subtree_root -> values.erase(subtree_root -> values.begin()); // remove the first value in the list
+    return;
+  }
+  if (key < n->key) {
+    if (!IsRed(n->left.get()) && !IsRed(n->left->left.get()))
+      MoveRedLeft(n);
+    Remove(n->left, key);
+  } else {
+    if (IsRed(n->left.get()))
+      RotateRight(n);
+
+    if (key == n->key && !n->right) {
+      // Remove n
+      n = nullptr;
+      return;
+    }
+
+    if (!IsRed(n->right.get()) && !IsRed(n->right->left.get()))
+      MoveRedRight(n);
+
+    if (key == n->key) {
+      // Find min node in the right subtree
+      Node *n_min = Min(n->right.get());
+      // Copy content from min node
+      n->key = n_min->key;
+      n->value = n_min->value;
+      // Delete min node recursively
+      DeleteMin(n->right);
+    } else {
+      Remove(n->right, key);
+    }
+  }
+
+  FixUp(n);
+}
+
+template <typename K, typename V>
+void Multi_Map<K, V>::Insert(const K &key, const V &value) {
+  Insert(root, key, value);
+  cur_size++;
+  root->color = BLACK;
+}
+
+template <typename K, typename V>
+void Multi_Map<K, V>::Insert(std::unique_ptr<Node> &n,
+                       const K &key, const V &value) {
+  if (!n)
+    n = std::unique_ptr<Node>(new Node{key, value, RED});
+  else if (key < n->key)
+    Insert(n->left, key, value);
+  else if (key > n->key)
+    Insert(n->right, key, value);
+  else if (key == current->key)
+    current->value.push_back(value); // add the value to the end of list 
+    return;
+  else
+    throw std::runtime_error("Key already inserted");
+
+  FixUp(n);
+}
+
+template <typename K, typename V>
+void Multi_Map<K, V>::Print() {
+  Print(root.get());
+  std::cout << std::endl;
+}
+
+template <typename K, typename V>
+void Multi_Map<K, V>::Print(Node *n) {
+  if (!n) return;
+  std::cout << subtree_root -> key << ": [";
+  // print all the values in the list 
+  for (size_t i = 0; i < subtree_root -> values.size(); i++) {
+    std::cout << subtree_root -> values[i];
+    if (i != subtree_root -> values.size() - 1) {
+      std::cout << ", ";
+    }
+  }
+    std::cout << "] " << std::endl;
+}
+
+#endif  // MULTI_MAP_H_
+
